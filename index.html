@@ -177,6 +177,35 @@
         const API_URL = "https://script.google.com/macros/s/AKfycbwZ6K4grgM6_gyqjZgAJu0SRyh9CUhHug1Ql_4R9FC1Cyzci-5FEhCG3iUyDewhDc8/exec"; 
         let USER_SESSION = null;
         let SELECTED_DONATUR_DATA = null;
+        <script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbyFZlze_6PNptK2z0Xs28y2QG6kVwQwYJ0uUGnqJFhdWSPO-qN8vuPVBvczdrZcbe75/exec"; 
+    let USER_SESSION = null;
+    let SELECTED_DONATUR_DATA = null;
+
+    // --- MULAI: FUNGSI FORMAT WA (STEP A) ---
+    function formatWA(noHp) {
+        if (!noHp) return '';
+        // Sanitasi: Ambil hanya angka saja
+        let cleaned = noHp.toString().replace(/[^0-9]/g, ''); 
+        // Logika Konversi: 08xx atau 8xx menjadi 628xx
+        if (cleaned.startsWith('0')) {
+            return '62' + cleaned.substring(1);
+        } else if (cleaned.startsWith('8')) {
+            return '62' + cleaned;
+        }
+        return cleaned;
+    }
+    // --- SELESAI: FUNGSI FORMAT WA ---
+
+    window.onload = function() {
+        const savedNama = localStorage.getItem('fundraiser_nama');
+        const savedPass = localStorage.getItem('fundraiser_pass');
+        if (savedNama && savedPass) {
+            document.getElementById('nama').value = savedNama;
+            document.getElementById('password').value = savedPass;
+            document.getElementById('rememberMe').checked = true;
+        }
+    };
 
         window.onload = function() {
             const savedNama = localStorage.getItem('fundraiser_nama');
@@ -347,26 +376,53 @@
         }
 
         function tambahDonatur() {
-            Swal.fire({
-                title: 'Donatur Baru',
-                html: `<input id="sw-nama" class="swal2-input" placeholder="Nama Lengkap">
-                       <input id="sw-hp" class="swal2-input" placeholder="WhatsApp (08...)">
-                       <input id="sw-almt" class="swal2-input" placeholder="Alamat (Opsional)">`,
-                confirmButtonText: 'Simpan', showCancelButton: true,
-                preConfirm: () => {
-                    const nama = document.getElementById('sw-nama').value; const hp = document.getElementById('sw-hp').value;
-                    if(!nama || !hp) return Swal.showValidationMessage('Nama & WA wajib diisi!');
-                    return { nama, noHp: hp, alamat: document.getElementById('sw-almt').value }
-                }
-            }).then(async (res) => {
-                if (res.isConfirmed) {
-                    Swal.fire({title: 'Menyimpan...', didOpen: () => Swal.showLoading()});
-                    const resp = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addDonatur', payload: res.value }) });
-                    const final = await resp.json();
-                    if(final.success) { Swal.fire('Berhasil', 'Donatur ditambahkan', 'success'); openDonaturPage(); }
-                }
-            });
+    Swal.fire({
+        title: 'Donatur Baru',
+        html: `<input id="sw-nama" class="swal2-input" placeholder="Nama Lengkap">
+               <input id="sw-hp" class="swal2-input" placeholder="WhatsApp (08...)">
+               <input id="sw-almt" class="swal2-input" placeholder="Alamat (Opsional)">`,
+        confirmButtonText: 'Simpan', 
+        showCancelButton: true,
+        preConfirm: () => {
+            const nama = document.getElementById('sw-nama').value; 
+            const hp = document.getElementById('sw-hp').value;
+            
+            if(!nama || !hp) return Swal.showValidationMessage('Nama & WA wajib diisi!');
+            
+            // --- LOGIKA ARCHITECT: SANITASI DI HULU ---
+            // Kita gunakan formatWA agar yang dikirim ke database sudah 62xxx
+            const noHpClean = formatWA(hp); 
+            
+            return { 
+                nama: nama, 
+                noHp: noHpClean, 
+                alamat: document.getElementById('sw-almt').value 
+            }
         }
+    }).then(async (res) => {
+        if (res.isConfirmed) {
+            Swal.fire({title: 'Menyimpan...', didOpen: () => Swal.showLoading()});
+            
+            // Payload yang dikirim sekarang sudah bersih (noHp: 628xxx)
+            const resp = await fetch(API_URL, { 
+                method: 'POST', 
+                body: JSON.stringify({ 
+                    action: 'addDonatur', 
+                    payload: res.value 
+                }) 
+            });
+            
+            const final = await resp.json();
+            if(final.success) { 
+                Swal.fire('Berhasil', 'Donatur ditambahkan', 'success'); 
+                // Pastikan fungsi ini ada untuk merefresh daftar di layar
+                if (typeof openDonaturPage === "function") openDonaturPage(); 
+            } else {
+                Swal.fire('Gagal', final.message, 'error');
+            }
+        }
+    });
+}
         async function downloadLaporanPDF() {
     // 1. Munculkan Popup pilihan tanggal
     const { value: formValues } = await Swal.fire({
